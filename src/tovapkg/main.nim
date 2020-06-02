@@ -97,10 +97,6 @@ template App*(appId, name: string, Layout: untyped): untyped =
   ctxt = newAppContext()
   ctxt.state = %*{}
   ctxt.route = "#/login"
-
-  # TEST CODE
-  # Make an async call, maybe using async/awiat
-  # excecute an callback after getting de response
   
   proc init(): Future[void] {.async.} =
     app = UiApp()
@@ -110,7 +106,6 @@ template App*(appId, name: string, Layout: untyped): untyped =
     app.title = name
     app.state = "loading"
     app.ctxt.actions = tova_actions
-#    app.ctxt.asyncActions = async_tova_actions
     app.ctxt.renderProcs = render_tova_procs
     app.layout = Layout
     ctxt = app.ctxt
