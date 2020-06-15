@@ -1,6 +1,5 @@
 
 import tables, json, strutils
-import uuidjs
 
 include karax / prelude
 import karax / [kbase, vdom, karaxdsl]
@@ -41,7 +40,7 @@ proc payload(el: UiElement): JsonNode =
     "type": el.objectType
   }
       
-proc buildElement(uiel: UiElement, viewid: string): VNode =
+proc buildElement(uiel: UiElement): VNode =
   var el: UiElement = uiel
 
   try:
@@ -53,7 +52,7 @@ proc buildElement(uiel: UiElement, viewid: string): VNode =
       result.addAttributes el
       
       for c in el.children:
-        let vkid = buildElement(c, viewid)
+        let vkid = buildElement(c)
         if not vkid.isNil:
           result.add vkid
     else:
@@ -79,8 +78,6 @@ proc buildElement(uiel: UiElement, viewid: string): VNode =
 proc updateUI*(app: var UiApp): VNode =
   var
     state = app.ctxt.state
-    view = state["view"]
-    viewid = view["id"].getStr
     action: string
 
   result = newVNode VnodeKind.tdiv
@@ -104,7 +101,7 @@ proc updateUI*(app: var UiApp): VNode =
       var payload = %*{"action": action}
       app.ctxt.actions[action](payload)
 
-  let h = buildElement(app.layout(app.ctxt), viewid)
+  let h = buildElement(app.layout(app.ctxt))
   if not h.isNil:
     result.add h
   

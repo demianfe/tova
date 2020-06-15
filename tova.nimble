@@ -11,4 +11,3 @@ installExt    = @["nim"]
 
 requires "nim >= 1.2.0"
 requires "https://github.com/pragmagic/karax.git"
-

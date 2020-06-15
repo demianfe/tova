@@ -5,7 +5,6 @@ include karax / prelude
 import karax / prelude
 import karax / [vdom, karaxdsl, kdom]
 
-import uuidjs
 import listeners
 
 import tova, build, actions
@@ -45,9 +44,6 @@ proc initNavigation() =
     ctxt.route = $window.location.hash
     ctxt.state["route"] = %($window.location.hash)
     prevHashPart = window.location.hash
-    let vid = genUUID()
-    ctxt.state{"history", vid} = %*{"id": %vid, "action": ctxt.state["route"]}
-    ctxt.state["view"] = %*{"id": %vid}
   except:
     let e = getCurrentException()
     echo e.msg
