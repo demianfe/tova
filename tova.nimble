@@ -9,6 +9,6 @@ installExt    = @["nim"]
 
 # Dependencies
 
-requires "nim >= 0.19.0"
-requires "https://github.com/demianfe/karax.git"
+requires "nim >= 1.2.0"
+requires "https://github.com/pragmagic/karax.git"
 
