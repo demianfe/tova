@@ -6,9 +6,7 @@ import karax / prelude
 import karax / [vdom, karaxdsl, kdom]
 
 import uuidjs
-
-import utils, listeners
-export utils
+import listeners
 
 import tova, build, actions
 
@@ -87,7 +85,6 @@ proc createAppDOM(rd: RouterData): VNode =
       result = initApp(app)
       app.state = "ready"
     else:
-      # TODO: show invalid state error
       echo "App invalid state."      
   except:
     result = handleCreateDomException()

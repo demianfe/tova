@@ -1,13 +1,11 @@
 
 import json, jsffi, tables, strutils, unicode
 
-
 proc genLabel(text: string): string =
   result = ""
   for i in text.split "_":
     result = result & " " &  (capitalize i)
             
-
 proc newButton*(b: JsonNode, id="", model, action: string, text="", mode= ""): JsonNode =
   result = copy b
   result["children"][0]["text"] = if text != "": %text else: %(genLabel action)
@@ -18,17 +16,14 @@ proc newButton*(b: JsonNode, id="", model, action: string, text="", mode= ""): J
     result["objid"] = %id
   if mode != "": result["mode"] = %mode
     
-
 # ui helper procs
 proc addChild*(parent: var JsonNode, child: JsonNode) =
   if not parent.haskey "children": parent["children"] = %[]
   parent["children"].add child
 
-
 proc addText*(parent: var JsonNode, text: string) =
   var txt = %*{"ui-type": %"#text", "text": %text}
   parent.addChild(txt)
-
 
 proc setText*(parent: var JsonNode, text: string) =
   if not parent.haskey("children") or parent["children"].isNil:
@@ -38,24 +33,20 @@ proc setText*(parent: var JsonNode, text: string) =
     if c["ui-type"] == %"#text" or c["ui-type"] == %"text":
       c["text"] = %text
       break
-
   
 proc setAttribute*(parent: var JsonNode, key, value: string) =
   ## if it does not exist it is added
   parent{"attributes", key} = %value
 
-
 proc removeAttribute*(parent: var JsonNode, key: string) =
   if parent.haskey("attributes") and parent["attributes"].haskey(key):
     parent["attributes"].delete key
   
-
 proc addEvent*(parent: var JsonNode, event: string) =
   ## if it does not exist it is added
   if not parent.haskey "events": parent["events"] = %[]
   if not parent["events"].contains %event:
     parent["events"].add %event
-
   
 proc getElement*(uiComponent: JsonNode, key, value: string): JsonNode =
   # returns the first match
@@ -66,7 +57,6 @@ proc getElement*(uiComponent: JsonNode, key, value: string): JsonNode =
       result = getElement(child, key, value)
       if result != nil:
         break
-
       
 proc getValue*(uiComponent: JsonNode, key, attr: string): JsonNode =
   let elem = getElement(uiComponent, key, attr)
@@ -74,15 +64,12 @@ proc getValue*(uiComponent: JsonNode, key, attr: string): JsonNode =
     result = elem["value"]
   elif uiComponent.hasKey("text"):
     result = elem["text"]
-
     
 proc getElementById*(uiComponent: JsonNode, id: string): JsonNode =
   getElement(uiComponent, "id", id)
 
-
 proc getValueById*(uiComponent: JsonNode, id: string): JsonNode =
   getValue(uiComponent, "id", id)
-
 
 proc updateValue*(uiComponent: var JsonNode, id, value: string) =
   if uiComponent.hasKey("id") and uiComponent["id"] == %id:
@@ -91,14 +78,12 @@ proc updateValue*(uiComponent: var JsonNode, id, value: string) =
     for child in uiComponent["children"].getElems:
       var c = child
       updateValue(c, id, value)
-
       
 proc getAttribute*(uiComponent: var JsonNode, id, attr: string): JsonNode =
   var element = getElement(uiComponent, "id", id)
   if element.hasKey("attributes"):
     if element["attributes"].hasKey(attr):
       result = element["attributes"][attr]
-
       
 proc setAttribute*(uiComponent: var JsonNode, id, attr, value: string) =
   # looks up in the components graph
@@ -107,7 +92,6 @@ proc setAttribute*(uiComponent: var JsonNode, id, attr, value: string) =
     element["attributes"] = %*{}
   element["attributes"].add(attr, %value)
   
-
 proc findElementsByAttrKey*(uiComponent: JsonNode, attrKey: string): seq[JsonNode] =
   # returns a sequence
   result = newSeq[JsonNode]()
@@ -117,7 +101,6 @@ proc findElementsByAttrKey*(uiComponent: JsonNode, attrKey: string): seq[JsonNod
   if uiComponent.hasKey("children"):
     for child in uiComponent["children"].getElems:
       result.add(findElementsByAttrKey(child, attrKey))
-
   
 proc findElementsByAttrValue*(uiComponent: JsonNode, attrKey, attrVal: string): seq[JsonNode] =
   # returns a sequence
@@ -129,7 +112,6 @@ proc findElementsByAttrValue*(uiComponent: JsonNode, attrKey, attrVal: string): 
   if uiComponent.hasKey("children"):
     for child in uiComponent["children"].getElems:
       result.add(findElementsByAttrValue(child, attrKey, attrVal))
-
 
 when defined(js):
   import karax / [vdom, kdom, karax]
