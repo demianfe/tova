@@ -46,11 +46,22 @@ proc add*(store: var Store, objType: string, obj: JsonNode) =
   # TODO: warn when an object cannot be added
   # (no id, etc)
   var so = StoreObj()
-  so.id = obj["id"].getStr
+  if obj["id"].kind == JInt:
+    so.id = $(obj["id"].getInt)
+  elif obj["id"].kind == JString:
+    so.id = obj["id"].getStr
+  else:
+    echo "Warning: object without id added."      
   so.`type` = objType
   so.data = obj
+  so.state = SObjState.synched  
   store.add so
 
+proc addAll*(store: var Store, objType: string, obj: JsonNode) =
+  if obj.kind == JArray:
+    for o in obj.items:
+      store.add(objType, o)
+  
 proc getItemByField*(store: Store, objType, field: string, value: JsonNode): StoreObj =
   var r: StoreObj
   var cmpr = proc(id: string , val: JsonNode): int {.closure.} =
