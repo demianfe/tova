@@ -17,16 +17,14 @@ var
   ctxt: AppContext
   app: UiApp
 
-proc setHashRoute(rd: RouterData) =
-  echo rd.hashPart
+proc setHashRoute(rd: RouterData) =  
   if prevHashPart != $rd.hashPart:
     ctxt.route = $rd.hashPart
-    ctxt.state["route"] = %($rd.hashPart)
     prevHashPart = $rd.hashPart
   elif $prevHashPart != ctxt.route:
     window.location.href = cstring(ctxt.route)
     prevHashPart = window.location.hash  
-
+    
 proc showError(): VNode =
   result = buildHtml(tdiv(class="container")):
     tdiv(class="alert alert-danger",role="alert"):
@@ -107,6 +105,5 @@ template App*(appId, name: string, Layout: untyped): untyped =
     `kxi` = setRenderer(createAppDOM)
     app.ctxt.kxi = `kxi`
     app.ctxt.window = window
-    app.ctxt.document = document
-                              
+    app.ctxt.document = document                              
   discard init()

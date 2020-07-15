@@ -145,16 +145,6 @@ proc addEvents*(n: var Vnode, el: UiElement) =
   else:
     echo "No context for UiElement"
     echo el
-
-# proc addListener*(el: var UiElement, l: string) =
-#   el.listeners.add l
-
-# proc `listeners=`*(el: var UiElement, ls: seq[string]) =
-#   for l in ls:
-#     el.listeners.add l
-
-# proc listeners*(el: UiElement): seq[string] =
-#   result = el.listeners
   
 proc addAttributes*(n: var Vnode, el: UiElement) =
   if el.id!="": n.id = el.id
@@ -355,6 +345,8 @@ proc eventHandler(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: E
         payload["value"] = %($n.getAttr "value")
       
     # TODO: improve event data passed.
+    # TODO: handle selection/edition
+      
     if not evt.isNil and evt.contains "key":
       event["keyCode"] = %(cast[KeyboardEvent](ev).keyCode)
       event["key"] = %($cast[KeyboardEvent](ev).key)
@@ -403,7 +395,7 @@ proc eventHandler(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: E
       callEventListener(payload, ctxt.actions)
       
       if eh in el.ctxt.renderProcs:
-        el.ctxt.render()      
+        el.ctxt.render()
 
 proc payload*(el: UiElement): JsonNode =
   result = %*{
@@ -415,27 +407,13 @@ proc payload*(el: UiElement): JsonNode =
     "type": el.objectType
   }
 
-
-# TODO: turn event call an proc call to async
-# dispatching too
-# figure out a mechanism to use callbacks 
-  
 proc dispatch*(el: UiElement, l: string) =
   if el.ctxt.actions.haskey l:
     let action = el.ctxt.actions[l]
     action(el.payload)
-  # elif el.ctxt.asyncActions.haskey l:
-  #   # render wating component
-  #   # await for execution
-  #   # continue rendering tree
-  #   let action = el.ctxt.asyncActions[l]        
-  #   discard action(el.payload)
 
   if l in el.ctxt.renderProcs:
     el.ctxt.render()
-# proc dispatch*(el: UiElement) =
-#   for l in el.listeners:
-#     el.dispatch(l)
     
 proc newAppContext*(): AppContext =
   result = AppContext()
@@ -447,7 +425,7 @@ proc newAppContext*(): AppContext =
       if $kev == ("on" & $uievk):
         result.eventsMap.add(uievk, kev)
         break
-
+  
 template web*(ctxt, n: untyped): untyped =
   result = newUiElement(ctxt)
   result.builder =

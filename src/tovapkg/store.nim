@@ -94,8 +94,8 @@ proc getItems*(store: Store, objType: string): seq[JsonNode] =
 proc setCurrent*(store: var Store, oType="", id: string) =
   var objType = oType
   if objType == "":
-      let c = store.getItem id
-      objType = c.`type`
+    let c = store.getItem id
+    objType = c.`type`
       
   if store.collection.hasKey objType:
     if objType != "":
@@ -109,25 +109,19 @@ proc setFieldValue*(store: var Store, id, field: string, value: JsonNode) =
 proc setOrCreateFieldValue*(store: var Store, objType, id, field: string, value: JsonNode) =
   if not store.data.haskey id:
      store.add StoreObj(id: id, `type`: objType, state: SObjState.new, data: %{field: value})
-  else:
-    store.setFieldValue(id, field, value)     
+  store.setFieldValue(id, field, value)
 
 proc getFieldValue*(store: var Store, id, field: string): JsonNode =
   if store.data.hasKey(id) and store.data[id].data.hasKey(field):
     result = store.data[id].data[field]
 
 proc delete*(store: var Store, id: string) =
-  # remove from lists
-  # remove object
-  echo "deleting access token"
   let
     obj = store.getItem(id)
     objType = obj.`type`
     indx = store.collection[objType].ids.find id
   delete(store.collection[objType].ids, indx, indx+1)
-  store.data.del id
-  echo store.collection[objType].ids.len
-  
+  store.data.del id  
   if store.collection[objType].ids.len == 0:
     store.collection.del objType
 
