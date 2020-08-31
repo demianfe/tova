@@ -4,7 +4,7 @@ when defined(js):
 else:
   import asyncdispatch
   
-import strutils, sequtils, tables, json, store
+import strutils, sequtils, tables, json, store, strformat
 import karax / [vdom, karaxdsl, kdom]
 include karax / prelude
 import karax / prelude
@@ -13,16 +13,17 @@ import listeners
 
 type
   MessageKind* = enum
-    normal, success, warning, error, primary
+    normal, success, warning, error, primary, danger
     
   AppMessage* = ref object
-    tilte*, content*: string
+    id*: string
+    title*: string
+    content*: string
     kind*: MessageKind
 
   AppContext* = ref object of RootObj
     state*: JsonNode
     actions*: Table[cstring, proc(payload: JsonNode)]
-#    asyncActions*: Table[cstring, proc(payload: JsonNode): Future[system.void]]
     renderProcs*: seq[string]
     navigate*: proc(ctxt: var AppContext, payload: JsonNode, viewid: string): JsonNode # returns the new payload
     store*: Store
@@ -37,6 +38,7 @@ type
     # karax objects
     window*: Window 
     document*: Document
+    navigator*: Navigator
     
   UiApp* = ref object
     id*: string
@@ -55,8 +57,8 @@ type
   UiElement* = ref UiElementObj
 
   UiEventKind* = enum
-    click, keydown, keyup
-
+    click, keydown, keyup, change
+    
   UiEvent* = object
     kind*: UiEventKind
     targetKind*: EventKind # karax event
@@ -75,7 +77,6 @@ type
     attributes*: Table[string, string]
     kids: seq[UiElement]
     events*: seq[UiEvent]
-    #listeners: seq[string] # seq of listeners to call before rendering this Element
     builder*: proc(el: UiElement): Vnode
     ctxt*: AppContext
     preventDefault*: bool
@@ -134,7 +135,26 @@ proc `$`*(ctxt: AppContext): string =
 proc elid*(el: UiElement): string =
   el.elid  
 
+proc hasAttr(n: Vnode, at, val: kstring): bool =
+  for attr in n.attrs:
+    if attr == (at, val):
+      result = true
+      break
+  
+proc mergeEvents*(n: var Vnode, el: UiElement) =
+  # check that the event wasnt already added
+  let ctxt = el.ctxt
+  if not ctxt.isNil:
+    for ev in el.events:
+      if ev.handler != "" and not n.hasAttr("eventhandler", ev.handler):
+        let targetKind = ctxt.eventsMap[ev.kind]
+        n.setAttr("eventhandler", ev.handler)
+        let eh = ctxt.eventHandler(ev, el, el.viewid)
+        n.addEventListener(targetKind, eh)
+
 proc addEvents*(n: var Vnode, el: UiElement) =
+  # Extracts events from the uielement and adds it
+  # to the low level component.
   let ctxt = el.ctxt
   if not ctxt.isNil:
     for ev in el.events:
@@ -145,13 +165,19 @@ proc addEvents*(n: var Vnode, el: UiElement) =
   else:
     echo "No context for UiElement"
     echo el
-  
+      
 proc addAttributes*(n: var Vnode, el: UiElement) =
+  # Merges the attribute using low level component
   if el.id!="": n.id = el.id
   if el.value != "":
     n.setAttr "value", el.value
   for k, v in el.attributes.pairs:
-    n.setAttr(k, v)
+    var attrVal = n.getAttr k
+    if attrVal == "" or attrVal == "null":
+      attrVal = attrVal & " " & v
+    else:
+      attrVal = v
+    n.setAttr(k, attrVal)
     
 proc hasAttribute*(el: UiElement, attr: string): bool =
   result = el.attributes.haskey attr  
@@ -161,14 +187,19 @@ proc getAttribute*(el: UiElement, key: string): string =
     result = el.attributes[key]
   
 proc setAttribute*(parent: var UiElement, key, value: string) =
-  # TODO: handle basic types
-  ## if it does not exist it is added
   parent.attributes[key] = value
+
+proc mergeAttribute*(parent: var UiElement, key, value: string) =
+  # merges with current attribute
+  var newVal = value
+  if parent.attributes.haskey(key) and parent.attributes[key] != "":
+    newVal = parent.attributes[key] & " " & value
+  parent.attributes[key] = newVal 
 
 proc removeAttribute*(parent: var UiElement, key: string) =
   if parent.attributes.haskey(key):
     parent.attributes.del key
-  
+
 proc addEvent*(parent: var UiElement, event: UiEvent) =
   ## if it does not exist it is added
   # remove the event and add it again
@@ -182,7 +213,7 @@ proc addEvent*(parent: var UiElement, event: UiEvent) =
     indx += 1
   if rm == true: parent.events.delete indx
   parent.events.add event
-  
+
 proc newUiElement*(): UiElement =
   result = UiElement()
   result.elid = $genId()
@@ -203,13 +234,17 @@ proc newUiElement*(kind: UiElementKind, id, label: string): UiElement =
 proc addEvent*(e: var UiElement, evk: UiEventKind) =
   var ev = UiEvent()
   ev.kind = evk
-  e.events.add ev  
-  
+  e.events.add ev
+    
 proc newUiElement*(ctxt: AppContext): UiElement =
   result = UiElement()
   result.ctxt = ctxt
   result.elid = $genId()
 
+proc newUiElement*(ctxt: AppContext, class: string): UiElement =
+  result = newUiElement(ctxt)
+  result.setAttribute("class", class)
+  
 proc newUiElement*(ctxt: AppContext, kind: UiElementKind): UiElement =
   result = newUiElement(ctxt)
   result.kind = kind
@@ -246,29 +281,56 @@ proc newUiEvent*(k: UiEventKind, handler: string):UiEvent =
   result.handler = handler
 
 # Messages
-proc newMessage*(content: string, kind: MessageKind): AppMessage =
+proc newMessage*(content: string, kind: MessageKind, title=""): AppMessage =
   result = AppMessage()
   result.content = content
   result.kind = kind
+  result.title = title
 
 proc newMessage*(content: string, title=""): AppMessage =
   result = newMessage(content, MessageKind.normal)
+  result.title = title
   
 proc newSuccessMessage*(content: string, title=""): AppMessage =
   result = newMessage(content, MessageKind.success)
+  result.title = title
   
 proc newWarningMessage*(content: string, title=""): AppMessage =
   result = newMessage(content, MessageKind.warning)
+  result.title = title
   
 proc newErrorMessage*(content: string, title=""): AppMessage =
   result = newMessage(content, MessageKind.error)
+  result.title = title
   
 proc newPrimaryMessage*(content: string, title=""): AppMessage =
   result = newMessage(content, MessageKind.primary)
-
-proc addMessage*(ctxt: AppContext, kind: string, content: string,  title="") =
+  result.title = title
+  
+proc newDangerMessage*(content: string, title=""): AppMessage =
+  result = newMessage(content, MessageKind.danger)
+  result.title = title
+  
+proc addMessage*(ctxt: AppContext, kind: MessageKind, content: string,  title="") =
   var msg: AppMessage  
-  case $kind
+  case kind
+  of MessageKind.success:
+    msg = newSuccessMessage(content, title)
+  of MessageKind.warning:
+    msg = newWarningMessage(content, title)
+  of MessageKind.error:
+    msg = newErrorMessage(content, title)
+  of MessageKind.primary:
+    msg = newPrimaryMessage(content, title)
+  of MessageKind.danger:
+    msg = newDangerMessage(content, title)
+  else:
+    msg = newMessage(content, title)
+  ctxt.messages.add msg
+
+proc addMessage*(ctxt: AppContext, kind: string, content: string,  title="") {.deprecated.}=
+  var msg: AppMessage  
+  case kind
   of "success":
     msg = newSuccessMessage(content, title)
   of "warning":
@@ -277,6 +339,8 @@ proc addMessage*(ctxt: AppContext, kind: string, content: string,  title="") =
     msg = newErrorMessage(content, title)
   of "primary":
     msg = newPrimaryMessage(content, title)
+  of "danger":
+    msg = newDangerMessage(content, title)
   else:
     msg = newMessage(content, title)  
   ctxt.messages.add msg
@@ -297,15 +361,15 @@ proc callEventListener(payload: JsonNode,
                         actions: Table[cstring, proc(payload: JsonNode)]) =
   var eventListener: proc(payload: JsonNode)
   var a, model, tova_action: string
-
+  
   let
     nodeKind = payload["node_kind"].getStr
     eventKind = payload["event_kind"].getStr.replace("on", "")
     defaultNodeAction = "default_action_" & nodeKind & "_" & eventKind
   
-  if payload.haskey("eventhandler"):
+  if payload.haskey("eventhandler") and payload["eventhandler"].getStr != "":
+    
     tova_action = payload["eventhandler"].getStr
-
   else:
     if payload.haskey("model"):
       model = payload["model"].getStr
@@ -329,24 +393,18 @@ proc callEventListener(payload: JsonNode,
   
 proc eventHandler(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: Event, n: VNode) =
   let ctxt = el.ctxt
-  result = proc(ev: Event, n: VNode) =    
-    if el.preventDefault:
-      ev.preventDefault()
-    let
-      evt = ev.`type`      
+  result = proc(ev: Event, n: VNode) =
+    ev.preventDefault()
+    let evt = ev.`type`
     var
       payload = %*{"value": %""}
       event = %*{"type": %($evt)}
 
     for k, v in n.attrs:
       if k == "model":
-        payload["model"] = %($n.getAttr "model") #%model
+        payload["model"] = %($n.getAttr "model")
       if k == "value":
-        payload["value"] = %($n.getAttr "value")
-      
-    # TODO: improve event data passed.
-    # TODO: handle selection/edition
-      
+        payload["value"] = %($n.getAttr "value")      
     if not evt.isNil and evt.contains "key":
       event["keyCode"] = %(cast[KeyboardEvent](ev).keyCode)
       event["key"] = %($cast[KeyboardEvent](ev).key)
@@ -355,26 +413,19 @@ proc eventHandler(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: E
     
     if n.kind == VnodeKind.input:
       payload["type"] = %($n.getAttr "type")
-
-    if payload.haskey("type") and (payload["type"].getStr == "date" or
-                                   payload["type"].getStr == "checkbox"):
-      # let the dom handle the events for the `input date`
-      discard
-    else:
-      ev.preventDefault()
-          
+    
     payload["node_kind"] = %($n.kind)
     payload["event_kind"] = %uiev.kind
-    
+
+    for attr in n.attrs:
+      payload[$attr[0]] = %($attr[1])
+      
     if n.getAttr("action") != nil:
       payload["action"] = %($n.getAttr "action")
-      
     if n.getAttr("mode") != nil:
       payload["mode"] = %($n.getAttr "mode")
-    
     if n.getAttr("name") != nil:
       payload["field"] = %($n.getAttr "name")
-
     if n.getAttr("field") != nil:
       payload["field"] = %($n.getAttr "field")
     
@@ -383,11 +434,12 @@ proc eventHandler(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: E
 
     if not n.value.isNil and n.value != "":
       payload["value"] = %($n.value)
+    if not n.id.isNil and n.id != "":
+      payload["id"] = %($n.id)
     
     if payload.haskey "action":
-      #payload = ctxt.navigate(ctxt, payload, viewid)
       callEventListener(payload, ctxt.actions)
-      reRender()
+
       
     elif n.getAttr("eventhandler") != nil:
       let eh = $n.getAttr "eventhandler"
@@ -411,9 +463,19 @@ proc dispatch*(el: UiElement, l: string) =
   if el.ctxt.actions.haskey l:
     let action = el.ctxt.actions[l]
     action(el.payload)
-
+  else:
+    echo fmt"""Event {l} does not exists"""    
   if l in el.ctxt.renderProcs:
     el.ctxt.render()
+
+proc dispatch*(ctxt: AppContext, action: string, payload: JsonNode) =
+  if ctxt.actions.haskey action:
+    let action = ctxt.actions[action]
+    action(payload)
+  else:
+    echo fmt"""Event {action} does not exists"""    
+  if action in ctxt.renderProcs:
+    ctxt.render()
     
 proc newAppContext*(): AppContext =
   result = AppContext()
@@ -427,9 +489,15 @@ proc newAppContext*(): AppContext =
         break
   
 template web*(ctxt, n: untyped): untyped =
+  # do not use it when element has events
   result = newUiElement(ctxt)
   result.builder =
     proc(el: UiElement): Vnode =
-      buildHtml(
-          n
-      )
+      buildHtml(n)
+        
+template web*(n: untyped): untyped =
+  # do not use it when element has events
+  result = newUiElement()
+  result.builder =
+    proc(el: UiElement): Vnode =
+      buildHtml(n)
