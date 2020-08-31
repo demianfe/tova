@@ -5,60 +5,22 @@ include karax / prelude
 import karax / [kbase, vdom, karaxdsl]
 
 import tova, utils
-
-const containersKind = [
-  UiElementKind.kUiElement,
-  UiElementKind.kHeader,
-  UiElementKind.kNavBar,
-  UiElementKind.kNavSection]
-
-proc callBuilder(elem: UiElement): VNode =
-  var el = elem
-  if not el.builder.isNil:
-    result = el.builder(elem)
-  elif el.kind == UiElementKind.kUiElement and el.attributes.len > 0:
-    result = buildHtml(tdiv())
-    result.addAttributes el
-
-  elif el.kind == UiElementKind.kUiElement:
-    for kid in el.children:
-      result = callBuilder(kid)
-
-  if not result.isNil:
-    for elkid in el.children:
-      let kid = callBuilder(elkid)
-      if not kid.isNil:
-        result.add kid
-
-proc payload(el: UiElement): JsonNode =
-  result = %*{
-    "id": el.id,
-    "field": el.field,
-    "label": el.label,
-    "value": el.value,
-    "kind": el.kind,
-    "type": el.objectType
-  }
-      
-proc buildElement(uiel: UiElement): VNode =
+  
+proc buildElement*(uiel: UiElement): VNode =
   var el: UiElement = uiel
 
   try:
-    if el.kind in containersKind:
-      if not el.builder.isNil:
-        result = el.builder(el)
-      else:
-        result = buildHtml(tdiv())
-      result.addAttributes el
-      
-      for c in el.children:
-        let vkid = buildElement(c)
-        if not vkid.isNil:
-          result.add vkid
+    if not el.builder.isNil:
+      result = el.builder(el)
     else:
-      if not el.builder.isNil:
-        result = callBuilder(el)
-        result.addAttributes el      
+      result = buildHtml(tdiv())
+      result.addAttributes el
+    
+    for c in el.children:
+      let vkid = buildElement(c)
+      if not vkid.isNil:
+        result.add vkid
+        
   except:
     var msg = ""
     let e = getCurrentException()

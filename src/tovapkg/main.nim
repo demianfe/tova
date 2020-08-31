@@ -69,7 +69,7 @@ proc createAppDOM(rd: RouterData): VNode =
   try:
     setHashRoute(rd)
     if ctxt.state.hasKey("error"):
-      result = showError()      
+      result = showError() 
     elif app.state == "ready":
       result = updateUI(app)
     elif app.state == "loading":

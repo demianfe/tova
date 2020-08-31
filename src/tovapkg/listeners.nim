@@ -31,40 +31,6 @@ proc createEventsTable(): NimNode =
     )
   )
 
-# proc createAsyncEventsTable(): NimNode =
-#   result = nnkIdentDefs.newTree(
-#     nnkPostfix.newTree(
-#       newIdentNode("*"),
-#       newIdentNode("async_tova_actions")
-#     ),
-#     newEmptyNode(),
-#     nnkCall.newTree(
-#       nnkBracketExpr.newTree(
-#         newIdentNode("initTable"),
-#         newIdentNode("cstring"),
-#         nnkProcTy.newTree(
-#           nnkFormalParams.newTree(
-#             nnkBracketExpr.newTree(
-#               newIdentNode("Future"),
-#               nnkDotExpr.newTree(
-#                 newIdentNode("system"),
-#                 newIdentNode("void")
-#               )
-#             ),
-#             nnkIdentDefs.newTree(
-#               newIdentNode("payload"),
-#               newIdentNode("JsonNode"),
-#               newEmptyNode()
-#             )
-#           ),
-#           nnkPragma.newTree(
-#             newIdentNode("closure")
-#           )
-#         )
-#       )
-#     )
-#   )
-
 proc createRenderSeq(): NimNode =
   result =
     nnkIdentDefs.newTree(
@@ -96,19 +62,6 @@ proc addEventListener(n: NimNode): NimNode =
     newIdentNode($n[0].ident)
   )
 
-# proc addAsyncEventListener(n: NimNode): NimNode =  
-#   result = nnkCall.newTree(
-#     nnkDotExpr.newTree(
-#       newIdentNode("async_tova_actions"),
-#       newIdentNode("add")
-#     ),
-#     nnkCallStrLit.newTree(
-#       newIdentNode("cstring"),      
-#       newLit($n[0].ident)
-#     ),
-#     newIdentNode($n[0].ident)
-#   )
-
 proc addRenderProc(n: NimNode): NimNode =
   result = nnkCall.newTree(
     nnkDotExpr.newTree(
@@ -118,14 +71,6 @@ proc addRenderProc(n: NimNode): NimNode =
     newLit($n[0].ident)
   )
   
-# get all anotations
-# proc isAsync(n: NimNode): bool =
-#   for c in n.children:
-#     if c.kind == nnkPragma:
-#       if c[0].kind == nnkIdent and c[0].strVal == "async":
-#         result = true
-#         break
-
 proc getPragmas(n: NimNode): seq[string] =
   for c in n.children:
     if c.kind == nnkPragma:
@@ -141,7 +86,6 @@ macro EventHandlers*(n: untyped): untyped =
   result = nnkStmtList.newTree(
     nnkVarSection.newTree(
       createEventsTable(),
-     # createAsyncEventsTable(),
       createRenderSeq()
     )
   )
@@ -157,14 +101,8 @@ macro EventHandlers*(n: untyped): untyped =
         
         evnames.add evName
         let pragmas = getPragmas(x)
-        # if "async" in pragmas:
-        #   echo "Adding async " & evName
-        #   result.add addAsyncEventListener(x)  
-        # else:
-        #   echo "Adding " & evName
-        #   result.add addEventListener(x)
         result.add addEventListener(x)
         if "render" in pragmas:
           echo "Adding Render proc: " & evName
           result.add addRenderProc(x)
-        
+
