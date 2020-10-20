@@ -9,7 +9,7 @@ import listeners
 
 import tova, build, actions
 
-var console {. importc, nodecl .}: JsObject
+#var console {. importc, nodecl .}: JsObjec
 
 var
   initialized = false
@@ -17,7 +17,7 @@ var
   ctxt: AppContext
   app: UiApp
 
-proc setHashRoute(rd: RouterData) =  
+proc setHashRoute(rd: RouterData) =
   if prevHashPart != $rd.hashPart:
     ctxt.route = $rd.hashPart
     prevHashPart = $rd.hashPart
@@ -35,7 +35,7 @@ proc showError(): VNode =
       a(href="#/home"):
         text "Go back home."
   ctxt.state.delete("error")
-  reRender()
+  ctxt.render()
 
 proc initNavigation() =
   try:
@@ -64,8 +64,7 @@ proc handleCreateDomException(): Vnode =
 proc createAppDOM(rd: RouterData): VNode =
   if ctxt.location[0] != "":
     window = window.open(ctxt.location[0], ctxt.location[1])
-    ctxt.location = ("", "")
-    
+    ctxt.location = ("", "")    
   try:
     setHashRoute(rd)
     if ctxt.state.hasKey("error"):

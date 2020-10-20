@@ -32,7 +32,7 @@ type
     messages*: seq[AppMessage]
     eventHandler*: proc(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: Event, n: VNode)
     eventsMap*: Table[tova.UiEventKind, EventKind]
-    render*: proc()
+    #render*: proc()
     kxi*: KaraxInstance
     location*: (string, string) # use window obj?
     # karax objects
@@ -72,7 +72,7 @@ type
     kind*: UiElementKind # kUiExolement for generic or custom elements
     label*: string # what is to be shown as label
     value*: string # the value of the field
-    objectType*: string # the object type, normaly an entity
+    model*: string # the object model the fields maps to
     field*: string # the field of the entity
     attributes*: Table[string, string]
     kids: seq[UiElement]
@@ -81,6 +81,9 @@ type
     ctxt*: AppContext
     preventDefault*: bool
 
+proc render*(ctxt: AppContext) =
+  ctxt.kxi.redraw()
+    
 var pid = 0
 template genId*: untyped =
   inc(pid)
@@ -348,11 +351,6 @@ proc addMessage*(ctxt: AppContext, kind: string, content: string,  title="") {.d
 proc addMessage*(ctxt: AppContext, m: AppMessage) =
   ctxt.messages.add m
 
-# Main
-proc reRender*()=
-  # wrap and expose redraw
-  `kxi`.redraw()
-
 proc noEventListener(payload: JsonNode, action: string): proc(payload: JsonNode) =
   result = proc(payload: JsonNode) =
     echo "WARNING: Action $1 not found in the table." % $action
@@ -367,8 +365,7 @@ proc callEventListener(payload: JsonNode,
     eventKind = payload["event_kind"].getStr.replace("on", "")
     defaultNodeAction = "default_action_" & nodeKind & "_" & eventKind
   
-  if payload.haskey("eventhandler") and payload["eventhandler"].getStr != "":
-    
+  if payload.haskey("eventhandler") and payload["eventhandler"].getStr != "":    
     tova_action = payload["eventhandler"].getStr
   else:
     if payload.haskey("model"):
@@ -390,64 +387,69 @@ proc callEventListener(payload: JsonNode,
   else:
     eventListener = noEventListener(payload, tova_action)
   eventListener payload
+
+proc makePayload*(ev: Event, n: VNode): JsonNode =
+  result = %*{"value": %""}
+  let evt = ev.`type`
+  var event = %*{"type": %($evt)}
+
+  for k, v in n.attrs:
+    result[$k] = %($v)
+    if k == "model":
+      result["model"] = %($n.getAttr "model")
+    if k == "value":
+      result["value"] = %($n.getAttr "value")
+
+  if not evt.isNil and evt.contains "key":
+    event["keyCode"] = %(cast[KeyboardEvent](ev).keyCode)
+    event["key"] = %($cast[KeyboardEvent](ev).key)
+
+  result["event"] = event
+  if n.kind == VnodeKind.input:
+    # colides with the input has a type
+    result["type"] = %($n.getAttr "type")
+  
+  #result["model"] = %($n.getAttr "model")
+    
+  result["node_kind"] = %($n.kind)
+  
+  for attr in n.attrs:
+    result[$attr[0]] = %($attr[1])
+      
+  if n.getAttr("action") != nil:
+    result["action"] = %($n.getAttr "action")
+  if n.getAttr("mode") != nil:
+    result["mode"] = %($n.getAttr "mode")
+  if n.getAttr("name") != nil:
+    result["field"] = %($n.getAttr "name")
+  if n.getAttr("field") != nil:
+    result["field"] = %($n.getAttr "field")
+
+  if not n.value.isNil and n.value != "":
+    result["value"] = %($n.value)
+  if not n.id.isNil and n.id != "":
+    result["id"] = %($n.id)
   
 proc eventHandler(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: Event, n: VNode) =
   let ctxt = el.ctxt
   result = proc(ev: Event, n: VNode) =
     ev.preventDefault()
-    let evt = ev.`type`
-    var
-      payload = %*{"value": %""}
-      event = %*{"type": %($evt)}
-
-    for k, v in n.attrs:
-      if k == "model":
-        payload["model"] = %($n.getAttr "model")
-      if k == "value":
-        payload["value"] = %($n.getAttr "value")      
-    if not evt.isNil and evt.contains "key":
-      event["keyCode"] = %(cast[KeyboardEvent](ev).keyCode)
-      event["key"] = %($cast[KeyboardEvent](ev).key)
- 
-    payload["event"] = event
+    var payload = makePayload(ev, n)
     
-    if n.kind == VnodeKind.input:
-      payload["type"] = %($n.getAttr "type")
-    
-    payload["node_kind"] = %($n.kind)
     payload["event_kind"] = %uiev.kind
-
-    for attr in n.attrs:
-      payload[$attr[0]] = %($attr[1])
-      
-    if n.getAttr("action") != nil:
-      payload["action"] = %($n.getAttr "action")
-    if n.getAttr("mode") != nil:
-      payload["mode"] = %($n.getAttr "mode")
-    if n.getAttr("name") != nil:
-      payload["field"] = %($n.getAttr "name")
-    if n.getAttr("field") != nil:
-      payload["field"] = %($n.getAttr "field")
     
     if el.id != "":
       payload["objid"] = %el.id
 
-    if not n.value.isNil and n.value != "":
-      payload["value"] = %($n.value)
-    if not n.id.isNil and n.id != "":
-      payload["id"] = %($n.id)
-    
     if payload.haskey "action":
       callEventListener(payload, ctxt.actions)
 
-      
     elif n.getAttr("eventhandler") != nil:
       let eh = $n.getAttr "eventhandler"
       payload["eventhandler"] = %(eh)
-      callEventListener(payload, ctxt.actions)
-      
+      callEventListener(payload, ctxt.actions)  
       if eh in el.ctxt.renderProcs:
-        el.ctxt.render()
+        render(el.ctxt)
 
 proc payload*(el: UiElement): JsonNode =
   result = %*{
@@ -456,7 +458,7 @@ proc payload*(el: UiElement): JsonNode =
     "label": el.label,
     "value": el.value,
     "kind": el.kind,
-    "type": el.objectType
+    "model": el.model
   }
 
 proc dispatch*(el: UiElement, l: string) =
@@ -467,7 +469,7 @@ proc dispatch*(el: UiElement, l: string) =
     echo fmt"""Event {l} does not exists"""    
   if l in el.ctxt.renderProcs:
     el.ctxt.render()
-
+    
 proc dispatch*(ctxt: AppContext, action: string, payload: JsonNode) =
   if ctxt.actions.haskey action:
     let action = ctxt.actions[action]
@@ -479,7 +481,7 @@ proc dispatch*(ctxt: AppContext, action: string, payload: JsonNode) =
     
 proc newAppContext*(): AppContext =
   result = AppContext()
-  result.render = reRender
+  #result.render = reRender
   result.eventHandler = eventHandler
   
   for uievk in tova.UiEventKind:

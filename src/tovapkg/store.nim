@@ -1,5 +1,23 @@
 
-import json, tables, sequtils, algorithm, times
+import json, tables, sequtils, algorithm, times, strformat
+
+## --- uuid ------
+import jsffi
+proc genUUID*(): string =
+  result = ""
+  proc random(): float {.importc: "Math.random".}
+  proc floor(n: float): int8 {.importcpp: "Math.floor(#)".}
+  for i in 0..35:
+    const adigits = "0123456789abcdef"
+    case i:
+      of 8, 13, 18, 23:
+        result &= "-"
+      of 14:
+        result &= "4"
+      else:
+        var r = random() * 16
+        result &= adigits[floor(r)]  
+## -- end uuid
 
 type
   SObjState* = enum
@@ -8,61 +26,69 @@ type
 # wrap json data for easier handling
 type
   StoreObj* = object
-    id*:  string
-    `type`*: string
+    id:  string
+    #model*: string
+    model*: string
     data*: JsonNode # use nim root obj (?)
-    state*: SObjState
+    state: SObjState
       
   ObjCollection = object
     current: string # id
-    `type`: string
+    model: string
     ids: seq[string] # ids
   
   Store* = object
     data*: Table[string, StoreObj] # id, obj
     collection: Table[string, ObjCollection] # type, Storecollection
-      
+    
 proc newStore*(): Store =
-  result =  Store()
+  result = Store()
   result.data = initTable[string, StoreObj]()
   result.collection = initTable[string, ObjCollection]()
+
+proc newStoreObj*(): StoreObj =
+  result = StoreObj(id: genUUID(), state: SObjState.new)
+
+proc newStoreObj*(so: StoreObj): StoreObj =
+  result = so
+  result.id = genUUID() #x?
+  
+proc newStoreObj*(model: string, state: SObjState, data: JsonNode): StoreObj =
+  result = StoreObj(id: genUUID(), model: model, state: state, data: data)
+
+proc id*(so: StoreObj): string =
+  result = so.id
   
 proc hasKey*(store: Store, key: string): bool =
   result = store.collection.haskey key
   
-proc getItem*(store: Store, id: string): StoreObj =
+proc getItem*(store: Store, id: string): StoreObj=
   result = store.data[id]
 
 proc add*(store: var Store, so: StoreObj) =
   # TODO: warn when an object cannot be added
   # (no id, etc)
-  if not store.collection.haskey so.`type`:
-    store.collection[so.`type`] = ObjCollection(`type`: so.`type`)
-    store.collection[so.`type`].ids = @[]
-  store.collection[so.`type`].ids.add so.id
+  if not store.collection.haskey so.model:
+    store.collection[so.model] = ObjCollection(model: so.model)
+    store.collection[so.model].ids = @[]
+  store.collection[so.model].ids.add so.id
   store.data[so.id] = so
 
-proc add*(store: var Store, objType: string, obj: JsonNode) =
+proc add*(store: var Store, model: string, data: JsonNode) =
   # TODO: warn when an object cannot be added
   # (no id, etc)
-  var so = StoreObj()
-  if obj["id"].kind == JInt:
-    so.id = $(obj["id"].getInt)
-  elif obj["id"].kind == JString:
-    so.id = obj["id"].getStr
-  else:
-    echo "Warning: object without id added."      
-  so.`type` = objType
-  so.data = obj
+  var so = newStoreObj()
+  so.model = model
+  so.data = data
   so.state = SObjState.synched  
   store.add so
 
-proc addAll*(store: var Store, objType: string, obj: JsonNode) =
+proc addAll*(store: var Store, model: string, obj: JsonNode) =
   if obj.kind == JArray:
     for o in obj.items:
-      store.add(objType, o)
-  
-proc getItemByField*(store: Store, objType, field: string, value: JsonNode): StoreObj =
+      store.add(model, o)
+
+proc getItemByField*(store: Store, model, field: string, value: JsonNode): StoreObj {.deprecated.} =
   var r: StoreObj
   var cmpr = proc(id: string , val: JsonNode): int {.closure.} =
     let obj = store.getItem id
@@ -71,45 +97,72 @@ proc getItemByField*(store: Store, objType, field: string, value: JsonNode): Sto
       result = 0
     else:
       result = -1
-  let exists = binarySearch(store.collection[objType].ids, value, cmpr)
+  let exists = binarySearch(store.collection[model].ids, value, cmpr)
   if exists == 0: result = r
 
-proc getCurrent*(store: Store, objType: string): StoreObj =
-  let cid = store.collection[objType].current
-  if cid != "":
-    result = getItem(store, cid)
-
-proc getCollection*(store: Store, objType: string): seq[StoreObj] =
+proc getCollection*(store: Store, model: string): seq[StoreObj] =
   result = @[]
-  if store.collection.haskey objType:
-    for id in store.collection[objType].ids:
+  if store.collection.haskey model:
+    for id in store.collection[model].ids:
       result.add store.data[id]
 
-proc getItems*(store: Store, objType: string): seq[JsonNode] =
+proc getItems*(store: Store, model: string): seq[JsonNode] =
   result = @[]
-  let collection = getCollection(store, objType)
+  let collection = getCollection(store, model)
   for item in collection:
     result.add item.data   
 
-proc setCurrent*(store: var Store, oType="", id: string) =
-  var objType = oType
-  if objType == "":
-    let c = store.getItem id
-    objType = c.`type`
-      
-  if store.collection.hasKey objType:
-    if objType != "":
-      store.collection[objType].current = id
+proc find*(store: Store, model, field: string, value: JsonNode): seq[StoreObj] =
+  for id in store.collection[model].ids:
+    let obj = store.getItem id
+    if obj.data.haskey(field) and obj.data[field] == value:
+      result.add obj  
+
+proc filter*(store: Store, model: string, f: proc(item: StoreObj): bool): seq[StoreObj] =
+  result = filter(store.getCollection(model), f)
+    
+proc setCurrent*(store: var Store, id: string) =
+  let
+    c = store.getItem id
+    ot = c.model
+  if store.collection.hasKey ot:
+    store.collection[ot].current = id
   else:
-    store.collection[objType] = ObjCollection(current: id)
+    store.collection[ot] = ObjCollection(current: id)
 
+proc getCurrent*(store: Store, model: string): StoreObj =
+  if store.collection.haskey model:
+    let cid = store.collection[model].current
+    if cid != "":
+      result = getItem(store, cid)
+
+proc unsetCurrent*(store: var Store, ot: string) =
+  if store.collection.haskey ot:
+    store.collection[ot].current = ""
+
+proc unsetCurrentId*(store: var Store, id: string) =
+  let c = store.getItem id
+  store.unsetCurrent c.model
+
+proc state*(so: StoreObj): SObjState =
+  result = so.state
+
+proc updateState*(store: var Store, id: string, state: SObjState) =
+  var so = store.getItem id
+  so.state = state
+  store.data[id] = so
+  
 proc setFieldValue*(store: var Store, id, field: string, value: JsonNode) =
-  store.data[id].data[field] = value
-
-proc setOrCreateFieldValue*(store: var Store, objType, id, field: string, value: JsonNode) =
-  if not store.data.haskey id:
-     store.add StoreObj(id: id, `type`: objType, state: SObjState.new, data: %{field: value})
-  store.setFieldValue(id, field, value)
+  if store.data.haskey id:
+    store.data[id].data[field] = value
+  else:
+    echo fmt"WARNING: object with id: {id} not found in store."
+    
+# proc setOrCreateFieldValue*(store: var Store, model, id, field: string, value: JsonNode): string =
+#   # returns the new id of the obj
+#   if not store.data.haskey id:
+#      store.add StoreObj(id: genUUID(), model: model, state: SObjState.new, data: %{field: value})
+#   store.setFieldValue(id, field, value)
 
 proc getFieldValue*(store: var Store, id, field: string): JsonNode =
   if store.data.hasKey(id) and store.data[id].data.hasKey(field):
@@ -118,13 +171,17 @@ proc getFieldValue*(store: var Store, id, field: string): JsonNode =
 proc delete*(store: var Store, id: string) =
   let
     obj = store.getItem(id)
-    objType = obj.`type`
-    indx = store.collection[objType].ids.find id
-  delete(store.collection[objType].ids, indx, indx+1)
+    model = obj.model
+    indx = store.collection[model].ids.find id
+  store.unsetCurrentId(id=id)
+  delete(store.collection[model].ids, indx, indx+1)
   store.data.del id  
-  if store.collection[objType].ids.len == 0:
-    store.collection.del objType
+  if store.collection[model].ids.len == 0:
+    store.collection.del model
 
 proc hasItem*(store: Store, id: string): bool =
   result = store.data.hasKey id
+  
+
+
   
