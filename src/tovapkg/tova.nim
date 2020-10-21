@@ -390,31 +390,23 @@ proc callEventListener(payload: JsonNode,
 
 proc makePayload*(ev: Event, n: VNode): JsonNode =
   result = %*{"value": %""}
+             
   let evt = ev.`type`
   var event = %*{"type": %($evt)}
 
   for k, v in n.attrs:
     result[$k] = %($v)
-    if k == "model":
-      result["model"] = %($n.getAttr "model")
-    if k == "value":
-      result["value"] = %($n.getAttr "value")
 
   if not evt.isNil and evt.contains "key":
     event["keyCode"] = %(cast[KeyboardEvent](ev).keyCode)
     event["key"] = %($cast[KeyboardEvent](ev).key)
 
   result["event"] = event
-  if n.kind == VnodeKind.input:
-    # colides with the input has a type
-    result["type"] = %($n.getAttr "type")
+  # if n.kind == VnodeKind.input:
+  #   # colides with the input has a type
+  #   result["type"] = %($n.getAttr "type")
   
-  #result["model"] = %($n.getAttr "model")
-    
   result["node_kind"] = %($n.kind)
-  
-  for attr in n.attrs:
-    result[$attr[0]] = %($attr[1])
       
   if n.getAttr("action") != nil:
     result["action"] = %($n.getAttr "action")

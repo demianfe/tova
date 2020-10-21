@@ -49,18 +49,26 @@ proc createRenderSeq(): NimNode =
       )
     )
   
-proc addEventListener(n: NimNode): NimNode =  
-  result = nnkCall.newTree(
-    nnkDotExpr.newTree(
+proc addEventListener(n: NimNode): NimNode =
+  result = nnkAsgn.newTree(
+    nnkBracketExpr.newTree(
       newIdentNode("tova_actions"),
-      newIdentNode("add")
-    ),
-    nnkCallStrLit.newTree(
-      newIdentNode("cstring"),      
       newLit($n[0].ident)
     ),
     newIdentNode($n[0].ident)
   )
+
+  # result = nnkCall.newTree(
+  #   nnkDotExpr.newTree(
+  #     newIdentNode("tova_actions"),
+  #     newIdentNode("add")
+  #   ),
+  #   nnkCallStrLit.newTree(
+  #     newIdentNode("cstring"),      
+  #     newLit($n[0].ident)
+  #   ),
+  #   newIdentNode($n[0].ident)
+  # )
 
 proc addRenderProc(n: NimNode): NimNode =
   result = nnkCall.newTree(
@@ -100,8 +108,9 @@ macro EventHandlers*(n: untyped): untyped =
           raise newException(Exception, msg)
         
         evnames.add evName
-        let pragmas = getPragmas(x)
         result.add addEventListener(x)
+        
+        let pragmas = getPragmas(x)
         if "render" in pragmas:
           echo "Adding Render proc: " & evName
           result.add addRenderProc(x)

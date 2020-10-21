@@ -86,7 +86,7 @@ proc createAppDOM(rd: RouterData): VNode =
 template App*(appId, name: string, Layout: untyped): untyped =
   ctxt = newAppContext()
   ctxt.state = %*{}
-  ctxt.route = "#/login"
+  ctxt.route = "#/"
   
   proc init(): Future[void] {.async.} =
     app = UiApp()
@@ -104,5 +104,5 @@ template App*(appId, name: string, Layout: untyped): untyped =
     `kxi` = setRenderer(createAppDOM)
     app.ctxt.kxi = `kxi`
     app.ctxt.window = window
-    app.ctxt.document = document                              
+    app.ctxt.document = document 
   discard init()
