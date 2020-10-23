@@ -431,7 +431,7 @@ proc eventHandler(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: E
     payload["event_kind"] = %uiev.kind
     
     if el.id != "":
-      payload["objid"] = %el.id
+      payload["sid"] = %el.id
 
     if payload.haskey "action":
       callEventListener(payload, ctxt.actions)
