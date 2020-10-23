@@ -21,15 +21,14 @@ proc genUUID*(): string =
 
 type
   SObjState* = enum
-    new, dirty, synched
+    new, dirty, sync
 
 # wrap json data for easier handling
 type
   StoreObj* = object
     id:  string
-    #model*: string
     model*: string
-    data*: JsonNode # use nim root obj (?)
+    data*: JsonNode
     state: SObjState
       
   ObjCollection = object
@@ -51,7 +50,7 @@ proc newStoreObj*(): StoreObj =
 
 proc newStoreObj*(so: StoreObj): StoreObj =
   result = so
-  result.id = genUUID() #x?
+  result.id = genUUID()
   
 proc newStoreObj*(model: string, state: SObjState, data: JsonNode): StoreObj =
   result = StoreObj(id: genUUID(), model: model, state: state, data: data)
@@ -80,7 +79,7 @@ proc add*(store: var Store, model: string, data: JsonNode) =
   var so = newStoreObj()
   so.model = model
   so.data = data
-  so.state = SObjState.synched  
+  so.state = SObjState.sync
   store.add so
 
 proc addAll*(store: var Store, model: string, obj: JsonNode) =
@@ -144,6 +143,11 @@ proc unsetCurrentId*(store: var Store, id: string) =
   let c = store.getItem id
   store.unsetCurrent c.model
 
+proc addCurrent*(store: var Store, s: StoreObj) =
+  #adds and sets as current
+  store.add s
+  store.setCurrent s.id
+  
 proc state*(so: StoreObj): SObjState =
   result = so.state
 
@@ -179,9 +183,13 @@ proc delete*(store: var Store, id: string) =
   if store.collection[model].ids.len == 0:
     store.collection.del model
 
+proc clear*(store: var Store, model: string) =
+  # deletes everything for a given model
+  if store.collection.haskey model:
+    let ids = store.collection[model].ids
+    for id in ids:
+      store.delete id
+  
 proc hasItem*(store: Store, id: string): bool =
   result = store.data.hasKey id
-  
-
-
   
