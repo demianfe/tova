@@ -178,8 +178,10 @@ proc delete*(store: var Store, id: string) =
     model = obj.model
     indx = store.collection[model].ids.find id
   store.unsetCurrentId(id=id)
-  delete(store.collection[model].ids, indx, indx+1)
-  store.data.del id  
+
+  if indx > 0:
+    delete(store.collection[model].ids, indx, indx+1)
+    store.data.del id  
   if store.collection[model].ids.len == 0:
     store.collection.del model
 
