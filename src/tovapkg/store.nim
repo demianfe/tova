@@ -39,6 +39,25 @@ type
   Store* = object
     data*: Table[string, StoreObj] # id, obj
     collection: Table[string, ObjCollection] # type, Storecollection
+
+proc `$`*(sos: SObjState): string =
+  result = $sos
+    
+proc `$`*(so: StoreObj): string =
+  result = fmt"id: {so.id} \n model: {so.model}"
+
+  #result.add ="\n state: " &
+  if so.data != nil:
+    result.add fmt"\n data: {so.data}"
+      
+proc `$`*(store: Store): string =
+  result = ""
+  #if store.data.len > :
+  result.add fmt"data: {store.data}"
+  result.add "\n"
+  
+#  if store.collection != nil:
+  result.add "collection:  " & $store.collection
     
 proc newStore*(): Store =
   result = Store()
@@ -162,12 +181,6 @@ proc setFieldValue*(store: var Store, id, field: string, value: JsonNode) =
   else:
     echo fmt"WARNING: object with id: {id} not found in store."
     
-# proc setOrCreateFieldValue*(store: var Store, model, id, field: string, value: JsonNode): string =
-#   # returns the new id of the obj
-#   if not store.data.haskey id:
-#      store.add StoreObj(id: genUUID(), model: model, state: SObjState.new, data: %{field: value})
-#   store.setFieldValue(id, field, value)
-
 proc getFieldValue*(store: var Store, id, field: string): JsonNode =
   if store.data.hasKey(id) and store.data[id].data.hasKey(field):
     result = store.data[id].data[field]
@@ -176,14 +189,19 @@ proc delete*(store: var Store, id: string) =
   let
     obj = store.getItem(id)
     model = obj.model
-    indx = store.collection[model].ids.find id
-  store.unsetCurrentId(id=id)
 
-  if indx > 0:
-    delete(store.collection[model].ids, indx, indx+1)
+  store.unsetCurrentId(id=id)
+  if store.data.haskey id:
     store.data.del id  
-  if store.collection[model].ids.len == 0:
-    store.collection.del model
+
+  if store.collection.haskey model:
+    let indx = store.collection[model].ids.find id    
+    if indx > 0:
+      echo "found"
+      delete(store.collection[model].ids, indx, indx+1)
+    if store.collection[model].ids.len == 1:
+      store.collection.del model
+  
 
 proc clear*(store: var Store, model: string) =
   # deletes everything for a given model
@@ -194,4 +212,3 @@ proc clear*(store: var Store, model: string) =
   
 proc hasItem*(store: Store, id: string): bool =
   result = store.data.hasKey id
-  
