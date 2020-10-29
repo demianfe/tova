@@ -7,7 +7,7 @@ import karax / [vdom, karaxdsl, kdom]
 
 import listeners
 
-import tova, build, actions
+import tova, actions
 
 #var console {. importc, nodecl .}: JsObjec
 
@@ -61,7 +61,7 @@ proc handleCreateDomException(): Vnode =
     result = showError()
 
 # uses app instead of ctxt
-proc createAppDOM(rd: RouterData): VNode =
+proc createAppDOM*(rd: RouterData): VNode =
   if ctxt.location[0] != "":
     window = window.open(ctxt.location[0], ctxt.location[1])
     ctxt.location = ("", "")    
@@ -70,12 +70,14 @@ proc createAppDOM(rd: RouterData): VNode =
     if ctxt.state.hasKey("error"):
       result = showError() 
     elif app.state == "ready":
-      result = updateUI(app)
+      #result = updateUI(app)
+      result = buildHtml(app.layout(app.ctxt))
     elif app.state == "loading":
       result = buildHtml(tdiv()):
         p:
           text "Loading ..."
-      result = initApp(app)
+      #result = initApp(app)
+      result = buildHtml(app.layout(app.ctxt))
       app.state = "ready"
     else:
       echo "App invalid state."      

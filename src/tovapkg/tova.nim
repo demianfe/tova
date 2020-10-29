@@ -32,7 +32,6 @@ type
     messages*: seq[AppMessage]
     eventHandler*: proc(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: Event, n: VNode)
     eventsMap*: Table[tova.UiEventKind, EventKind]
-    #render*: proc()
     kxi*: KaraxInstance
     location*: (string, string) # use window obj?
     # karax objects
@@ -43,7 +42,8 @@ type
   UiApp* = ref object
     id*: string
     title*: string
-    layout*: proc(ctxt: AppContext): UiElement
+    #layout*: proc(ctxt: AppContext): UiElement
+    layout*: proc(ctxt: AppContext): Vnode
     state*: string
     ctxt*: AppContext
 
@@ -114,6 +114,10 @@ proc `children=`*(parent: UiElement, kids: openArray[UiElement]) =
 proc children*(parent: UiElement): seq[UiElement] =
   result = parent.kids
 
+proc `$`*(m: AppMessage): string =
+  result = "id: " & m.id
+  result.add "\ncontent: " & m.content
+  
 proc `$`*(el: UiElement): string =
   result = ""
   result.add "\nelid: " & el.elid
@@ -329,6 +333,7 @@ proc addMessage*(ctxt: AppContext, kind: MessageKind, content: string,  title=""
     msg = newDangerMessage(content, title)
   else:
     msg = newMessage(content, title)
+  msg.id = $ctxt.messages.len
   ctxt.messages.add msg
 
 proc addMessage*(ctxt: AppContext, kind: string, content: string,  title="") {.deprecated.}=
@@ -345,7 +350,8 @@ proc addMessage*(ctxt: AppContext, kind: string, content: string,  title="") {.d
   of "danger":
     msg = newDangerMessage(content, title)
   else:
-    msg = newMessage(content, title)  
+    msg = newMessage(content, title)
+  msg.id = $ctxt.messages.len
   ctxt.messages.add msg
   
 proc addMessage*(ctxt: AppContext, m: AppMessage) =
