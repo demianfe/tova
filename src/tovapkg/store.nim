@@ -197,7 +197,6 @@ proc delete*(store: var Store, id: string) =
   if store.collection.haskey model:
     let indx = store.collection[model].ids.find id    
     if indx > 0:
-      echo "found"
       delete(store.collection[model].ids, indx, indx+1)
     if store.collection[model].ids.len == 1:
       store.collection.del model
