@@ -60,8 +60,29 @@ proc handleCreateDomException(): Vnode =
     ctxt.state["error"] = %msg
     result = showError()
 
+
+proc extractUrlAndDispatch() =
+  if ctxt.route != "":
+    let
+      sr = ctxt.route.split("?")
+    if sr.len > 1:
+      ctxt.route = sr[0]
+      let qs = sr[1].split("&")
+      for q in qs:
+        let kv = q.split("=")
+        if kv.len > 1:
+          ctxt.queryString.add kv[0], kv[1]
+        else:
+          ctxt.queryString.add kv[0], kv[0]
+          
+    let action = app.ctxt.route.replace("#/", "")
+    if app.ctxt.actions.haskey action:
+      var payload = %*{"action": action}
+      app.ctxt.actions[action](payload)
+          
+    
 # uses app instead of ctxt
-proc createAppDOM*(rd: RouterData): VNode =
+proc createAppDOM*(rd: RouterData): VNode =  
   if ctxt.location[0] != "":
     window = window.open(ctxt.location[0], ctxt.location[1])
     ctxt.location = ("", "")    
@@ -72,12 +93,14 @@ proc createAppDOM*(rd: RouterData): VNode =
     elif app.state == "ready":
       #result = updateUI(app)
       result = buildHtml(app.layout(app.ctxt))
+      extractUrlAndDispatch()
     elif app.state == "loading":
       result = buildHtml(tdiv()):
         p:
           text "Loading ..."
       #result = initApp(app)
       result = buildHtml(app.layout(app.ctxt))
+      extractUrlAndDispatch()
       app.state = "ready"
     else:
       echo "App invalid state."      
