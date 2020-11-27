@@ -4,10 +4,7 @@ import json, tables, jsffi, strutils, times, asyncjs
 include karax / prelude
 import karax / prelude
 import karax / [vdom, karaxdsl, kdom]
-
-import listeners
-
-import tova, actions
+import tova, dispatcher
 
 #var console {. importc, nodecl .}: JsObjec
 
@@ -124,7 +121,6 @@ template App*(appId, name: string, Layout: untyped): untyped =
     app.ctxt.renderProcs = render_tova_procs
     app.layout = Layout
     ctxt = app.ctxt
-    loadDefaultActions(app)
     initNavigation()
     `kxi` = setRenderer(createAppDOM)
     app.ctxt.kxi = `kxi`

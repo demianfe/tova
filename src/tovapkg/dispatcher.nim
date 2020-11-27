@@ -89,7 +89,7 @@ proc getPragmas(n: NimNode): seq[string] =
       
 template render* {.pragma.}
 
-macro EventHandlers*(n: untyped): untyped =
+macro Actions*(n: untyped): untyped =
   # actions table
   result = nnkStmtList.newTree(
     nnkVarSection.newTree(

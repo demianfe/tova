@@ -9,7 +9,8 @@ import karax / [vdom, karaxdsl, kdom]
 include karax / prelude
 import karax / prelude
 
-import listeners
+import dispatcher
+
 
 type
   MessageKind* = enum
@@ -30,7 +31,7 @@ type
     queryString*: OrderedTable[string, string]
     route*: string
     messages*: seq[AppMessage]
-    eventHandler*: proc(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: Event, n: VNode)
+    #eventHandler*: proc(uiev: tova.UiEvent, el: UiElement, viewid: string): proc(ev: Event, n: VNode)
     eventsMap*: Table[tova.UiEventKind, EventKind]
     kxi*: KaraxInstance
     location*: (string, string) # use window obj?
@@ -148,30 +149,30 @@ proc hasAttr(n: Vnode, at, val: kstring): bool =
       result = true
       break
   
-proc mergeEvents*(n: var Vnode, el: UiElement) =
-  # check that the event wasnt already added
-  let ctxt = el.ctxt
-  if not ctxt.isNil:
-    for ev in el.events:
-      if ev.handler != "" and not n.hasAttr("eventhandler", ev.handler):
-        let targetKind = ctxt.eventsMap[ev.kind]
-        n.setAttr("eventhandler", ev.handler)
-        let eh = ctxt.eventHandler(ev, el, el.viewid)
-        n.addEventListener(targetKind, eh)
+# proc mergeEvents*(n: var Vnode, el: UiElement) =
+#   # check that the event wasnt already added
+#   let ctxt = el.ctxt
+#   if not ctxt.isNil:
+#     for ev in el.events:
+#       if ev.handler != "" and not n.hasAttr("eventhandler", ev.handler):
+#         let targetKind = ctxt.eventsMap[ev.kind]
+#         n.setAttr("eventhandler", ev.handler)
+#         let eh = ctxt.eventHandler(ev, el, el.viewid)
+#         n.addEventListener(targetKind, eh)
 
-proc addEvents*(n: var Vnode, el: UiElement) =
-  # Extracts events from the uielement and adds it
-  # to the low level component.
-  let ctxt = el.ctxt
-  if not ctxt.isNil:
-    for ev in el.events:
-      let targetKind = ctxt.eventsMap[ev.kind]
-      n.setAttr("eventhandler", ev.handler)
-      let eh = ctxt.eventHandler(ev, el, el.viewid)
-      n.addEventListener(targetKind, eh)
-  else:
-    echo "No context for UiElement"
-    echo el
+# proc addEvents*(n: var Vnode, el: UiElement) =
+#   # Extracts events from the uielement and adds it
+#   # to the low level component.
+#   let ctxt = el.ctxt
+#   if not ctxt.isNil:
+#     for ev in el.events:
+#       let targetKind = ctxt.eventsMap[ev.kind]
+#       n.setAttr("eventhandler", ev.handler)
+#       let eh = ctxt.eventHandler(ev, el, el.viewid)
+#       n.addEventListener(targetKind, eh)
+#   else:
+#     echo "No context for UiElement"
+#     echo el
       
 proc addAttributes*(n: var Vnode, el: UiElement) =
   # Merges the attribute using low level component
@@ -371,8 +372,8 @@ proc callEventListener(payload: JsonNode,
     eventKind = payload["event_kind"].getStr.replace("on", "")
     defaultNodeAction = "default_action_" & nodeKind & "_" & eventKind
   
-  if payload.haskey("eventhandler") and payload["eventhandler"].getStr != "":    
-    tova_action = payload["eventhandler"].getStr
+  if payload.haskey("action") and payload["action"].getStr != "":    
+    tova_action = payload["action"].getStr
   else:
     if payload.haskey("model"):
       model = payload["model"].getStr
@@ -480,13 +481,13 @@ proc dispatch*(ctxt: AppContext, action: string, payload: JsonNode) =
 proc newAppContext*(): AppContext =
   result = AppContext()
   #result.render = reRender
-  result.eventHandler = eventHandler
+  #result.eventHandler = eventHandler
   
-  for uievk in tova.UiEventKind:
-    for kev in EventKind:
-      if $kev == ("on" & $uievk):
-        result.eventsMap.add(uievk, kev)
-        break
+  # for uievk in tova.UiEventKind:
+  #   for kev in EventKind:
+  #     if $kev == ("on" & $uievk):
+  #       result.eventsMap.add(uievk, kev)
+  #       break
   
 template web*(ctxt, n: untyped): untyped =
   # do not use it when element has events
