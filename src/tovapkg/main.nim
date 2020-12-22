@@ -112,7 +112,6 @@ template App*(appId, name: string, Layout: untyped): untyped =
   
   proc init(): Future[void] {.async.} =
     app = UiApp()
-    await initActions ctxt
     app.ctxt = ctxt
     app.id = appId
     app.title = name
@@ -125,5 +124,6 @@ template App*(appId, name: string, Layout: untyped): untyped =
     `kxi` = setRenderer(createAppDOM)
     app.ctxt.kxi = `kxi`
     app.ctxt.window = window
-    app.ctxt.document = document 
+    app.ctxt.document = document
+    await initActions ctxt
   discard init()
